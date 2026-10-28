@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ebook RAG</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">📚 <span>Ebook RAG</span></div>
+  <nav>
+    <button class="tab active" data-view="ask">Ask</button>
+    <button class="tab" data-view="library">Library <span id="book-count" class="pill">0</span></button>
+  </nav>
+  <div id="health" class="health" title="Ollama status">●</div>
+</header>
+
+<main>
+  <!-- ASK -->
+  <section id="view-ask" class="view active">
+    <div id="filter" class="filter"></div>
+    <div id="chat" class="chat">
+      <div class="empty" id="chat-empty">
+        <h2>Ask your bookshelf</h2>
+        <p>Questions are answered by <b id="llm-name">llama3</b> using passages retrieved from your ebooks.</p>
+        <div class="suggestions">
+          <button>What are the SOLID principles? Give an example of each.</button>
+          <button>When should I prefer composition over inheritance?</button>
+          <button>How do I design an idempotent API?</button>
+        </div>
+      </div>
+    </div>
+    <form id="ask-form" class="composer">
+      <textarea id="question" rows="1" placeholder="Ask about your ebooks… (Enter to send, Shift+Enter for newline)"></textarea>
+      <button type="button" id="clear" class="ghost" title="New conversation">⟲</button>
+      <button type="submit" id="send">Send</button>
+    </form>
+  </section>
+
+  <!-- LIBRARY -->
+  <section id="view-library" class="view">
+    <label id="dropzone" class="dropzone">
+      <input id="file-input" type="file" multiple accept=".pdf,.epub,.txt,.md" hidden>
+      <div class="dz-icon">⬆</div>
+      <div><b>Drop ebooks here</b> or click to browse</div>
+      <div class="muted">PDF, EPUB, TXT, MD · indexed locally into ChromaDB</div>
+    </label>
+    <div id="books" class="books"></div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Environment & secrets
+.venv/
+.env
+
+# Runtime data (uploaded copies, Chroma index, logs); rebuilt from sources/ with import_folder.py
+data/
+
+__pycache__/
+*.pyc
+.DS_Store

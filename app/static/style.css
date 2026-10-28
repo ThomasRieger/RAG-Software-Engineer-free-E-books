@@ -1,0 +1,121 @@
+:root {
+  --bg: #f7f7f8; --panel: #ffffff; --text: #1d1d1f; --muted: #6b6b76;
+  --border: #e3e3e8; --accent: #4f46e5; --accent-soft: #eef0ff;
+  --ok: #16a34a; --warn: #d97706; --err: #dc2626; --code: #f1f1f4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111114; --panel: #1a1a1f; --text: #ececf1; --muted: #9a9aa6;
+    --border: #2c2c34; --accent: #818cf8; --accent-soft: #23243a; --code: #24242c;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+  background: var(--bg); color: var(--text); display: flex; flex-direction: column;
+}
+button { font: inherit; cursor: pointer; }
+
+header {
+  display: flex; align-items: center; gap: 24px; padding: 10px 20px;
+  border-bottom: 1px solid var(--border); background: var(--panel);
+}
+.brand { font-weight: 650; font-size: 17px; }
+nav { display: flex; gap: 4px; }
+.tab {
+  border: 0; background: none; color: var(--muted); padding: 6px 12px; border-radius: 8px;
+}
+.tab.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.pill { font-size: 12px; background: var(--border); color: var(--text); border-radius: 10px; padding: 0 7px; }
+.health { margin-left: auto; font-size: 13px; color: var(--muted); }
+.health.ok { color: var(--ok); } .health.bad { color: var(--err); }
+
+main { flex: 1; min-height: 0; display: flex; justify-content: center; }
+.view { display: none; flex-direction: column; width: 100%; max-width: 880px; padding: 16px 20px; min-height: 0; }
+.view.active { display: flex; }
+
+/* Ask */
+.filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip {
+  border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+  border-radius: 999px; padding: 3px 10px; font-size: 13px; max-width: 260px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.chat { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding: 8px 2px 16px; }
+.empty { margin: auto; text-align: center; color: var(--muted); max-width: 520px; }
+.empty h2 { color: var(--text); margin-bottom: 4px; }
+.suggestions { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.suggestions button {
+  border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  border-radius: 10px; padding: 10px 14px; text-align: left;
+}
+.suggestions button:hover { border-color: var(--accent); }
+
+.msg { display: flex; flex-direction: column; gap: 6px; }
+.msg.user .bubble {
+  align-self: flex-end; background: var(--accent); color: #fff; border-radius: 14px 14px 4px 14px;
+  padding: 9px 14px; max-width: 80%; white-space: pre-wrap;
+}
+.msg.bot .bubble {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 4px 16px;
+  overflow-x: auto;
+}
+.bubble pre { background: var(--code); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+.bubble code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.bubble :not(pre) > code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.bubble.typing::after { content: "▍"; animation: blink 1s steps(1) infinite; color: var(--accent); }
+@keyframes blink { 50% { opacity: 0; } }
+
+.sources summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.source {
+  border-left: 3px solid var(--accent); background: var(--panel); padding: 6px 10px; margin: 6px 0;
+  font-size: 13px; border-radius: 0 6px 6px 0;
+}
+.source .head { font-weight: 600; }
+.source .head span { color: var(--muted); font-weight: 400; }
+.source .text { color: var(--muted); white-space: pre-wrap; max-height: 9em; overflow: hidden; }
+.source.open .text { max-height: none; }
+
+.composer {
+  display: flex; gap: 8px; align-items: flex-end; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 14px; padding: 8px;
+}
+.composer textarea {
+  flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--text);
+  font: inherit; max-height: 200px; padding: 6px;
+}
+.composer button { border: 0; border-radius: 10px; padding: 8px 16px; background: var(--accent); color: #fff; font-weight: 600; }
+.composer button.ghost { background: transparent; color: var(--muted); padding: 8px 10px; }
+.composer button:disabled { opacity: .5; cursor: default; }
+
+/* Library */
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+  border: 2px dashed var(--border); border-radius: 14px; padding: 36px 16px; background: var(--panel);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.dropzone.over { border-color: var(--accent); background: var(--accent-soft); }
+.dz-icon { font-size: 28px; color: var(--accent); }
+.muted { color: var(--muted); font-size: 13px; }
+.books { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; overflow-y: auto; }
+.book {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
+}
+.book .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book .meta { font-size: 13px; color: var(--muted); }
+.book .status { font-size: 12px; font-weight: 600; text-transform: uppercase; }
+.status.ready { color: var(--ok); } .status.processing, .status.queued { color: var(--warn); } .status.error { color: var(--err); }
+.book .del { border: 0; background: none; color: var(--muted); font-size: 18px; }
+.book .del:hover { color: var(--err); }
+.bar { grid-column: 1 / -1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); transition: width .3s; }
+.err { grid-column: 1 / -1; color: var(--err); font-size: 13px; }
+
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: 8px; transition: transform .25s;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
