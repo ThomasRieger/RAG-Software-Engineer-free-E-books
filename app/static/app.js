@@ -1,5 +1,5 @@
 const $ = (s) => document.querySelector(s);
-const state = { books: [], selected: new Set(), history: [], busy: false };
+const state = { books: [], history: [], busy: false };
 
 // ------------------------------------------------------------------ helpers
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -68,7 +68,7 @@ async function checkHealth() {
 async function loadBooks() {
   state.books = await (await fetch("/api/books")).json();
   renderBooks();
-  renderFilter();
+  renderLibSize();
   if (state.books.some((b) => b.status === "queued" || b.status === "processing")) {
     clearTimeout(loadBooks._t);
     loadBooks._t = setTimeout(loadBooks, 1500);
@@ -100,7 +100,6 @@ $("#books").addEventListener("click", async (e) => {
   const book = state.books.find((b) => b.id === id);
   if (!confirm(`Delete "${book.title}" and its vectors?`)) return;
   await fetch(`/api/books/${id}`, { method: "DELETE" });
-  state.selected.delete(id);
   loadBooks();
 });
 
@@ -125,21 +124,11 @@ dz.addEventListener("drop", (e) => upload([...e.dataTransfer.files]));
 window.addEventListener("dragover", (e) => e.preventDefault());
 window.addEventListener("drop", (e) => { e.preventDefault(); if (!dz.contains(e.target)) upload([...e.dataTransfer.files]); });
 
-// ------------------------------------------------------------------ book filter
-function renderFilter() {
-  const ready = state.books.filter((b) => b.status === "ready");
-  $("#filter").innerHTML = ready.length < 2 ? "" :
-    `<span class="muted" style="align-self:center">Search in:</span>
-     <button class="chip ${state.selected.size ? "" : "on"}" data-all>All books</button>` +
-    ready.map((b) => `<button class="chip ${state.selected.has(b.id) ? "on" : ""}" data-id="${b.id}" title="${esc(b.title)}">${esc(b.title)}</button>`).join("");
+// ------------------------------------------------------------------ greeting
+function renderLibSize() {
+  const n = state.books.filter((b) => b.status === "ready").length;
+  $("#lib-size").textContent = `your ${n} book${n === 1 ? "" : "s"}`;
 }
-$("#filter").addEventListener("click", (e) => {
-  const t = e.target;
-  if (t.dataset.all !== undefined) state.selected.clear();
-  else if (t.dataset.id) state.selected.has(t.dataset.id) ? state.selected.delete(t.dataset.id) : state.selected.add(t.dataset.id);
-  else return;
-  renderFilter();
-});
 
 // ------------------------------------------------------------------ chat
 const q = $("#question");
@@ -156,7 +145,9 @@ function addMsg(role, html) {
   $("#chat-empty").style.display = "none";
   const msg = document.createElement("div");
   msg.className = `msg ${role}`;
-  msg.innerHTML = `<div class="bubble">${html}</div>`;
+  msg.innerHTML = role === "bot"
+    ? `<div class="avatar">AI</div><div class="body"><div class="bubble">${html}</div></div>`
+    : `<div class="bubble">${html}</div>`;
   $("#chat").appendChild(msg);
   msg.scrollIntoView({ block: "end" });
   return msg;
@@ -171,7 +162,7 @@ function renderSources(msg, sources) {
       <div class="head">[${i + 1}] ${esc(s.title)} <span>${esc(s.location || "")} · relevance ${s.score}</span></div>
       <div class="text">${esc(s.text)}</div>
     </div>`).join("");
-  msg.appendChild(d);
+  msg.querySelector(".body").appendChild(d);
 }
 
 $("#ask-form").addEventListener("submit", async (e) => {
@@ -183,7 +174,7 @@ $("#ask-form").addEventListener("submit", async (e) => {
   q.value = ""; q.style.height = "auto";
 
   addMsg("user", esc(question));
-  const msg = addMsg("bot", "");
+  const msg = addMsg("bot", '<span class="dots"><i></i><i></i><i></i></span>');
   const bubble = msg.querySelector(".bubble");
   bubble.classList.add("typing");
   let answer = "";
@@ -193,7 +184,7 @@ $("#ask-form").addEventListener("submit", async (e) => {
     const res = await fetch("/api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, history: state.history, book_ids: [...state.selected] }),
+      body: JSON.stringify({ question, history: state.history }),
     });
     if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
     const reader = res.body.getReader();
@@ -223,6 +214,7 @@ $("#ask-form").addEventListener("submit", async (e) => {
   } catch (err) {
     bubble.innerHTML = md(answer) + `<p style="color:var(--err)">⚠ ${esc(err.message)}</p>`;
   } finally {
+    if (bubble.querySelector(".dots")) bubble.innerHTML = '<p class="muted">No answer was generated.</p>';
     bubble.classList.remove("typing");
     state.busy = false;
     $("#send").disabled = false;
