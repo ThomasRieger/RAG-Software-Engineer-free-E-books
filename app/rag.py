@@ -159,6 +159,47 @@ def delete_book(book_id: str) -> bool:
     return True
 
 
+# ---------------------------------------------------------------- exploring the index
+
+
+def _dir_size(path: Path) -> int:
+    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+
+
+def index_stats() -> dict:
+    sqlite = config.CHROMA_DIR / "chroma.sqlite3"
+    sample = _store.get(limit=1, include=["embeddings"])
+    dims = len(sample["embeddings"][0]) if len(sample["ids"]) else 0
+    return {
+        "collection": config.COLLECTION_NAME,
+        "chunks": _store._collection.count(),
+        "books": sum(b["status"] == "ready" for b in list_books()),
+        "embed_model": config.EMBED_MODEL,
+        "dimensions": dims,
+        "chunk_size": config.CHUNK_SIZE,
+        "chunk_overlap": config.CHUNK_OVERLAP,
+        "sqlite_bytes": sqlite.stat().st_size if sqlite.exists() else 0,
+        "vectors_bytes": _dir_size(config.CHROMA_DIR) - (sqlite.stat().st_size if sqlite.exists() else 0),
+    }
+
+
+def list_chunks(book_id: str | None, text: str | None, offset: int = 0, limit: int = 50) -> dict:
+    """Passages in index order, optionally for one book and/or containing some text."""
+    filters = {"where": {"book_id": book_id} if book_id else None,
+               "where_document": {"$contains": text} if text else None}
+    total = len(_store.get(**filters, include=[])["ids"])
+    page = _store.get(**filters, offset=offset, limit=limit, include=["documents", "metadatas"])
+    return {
+        "total": total,
+        "chunks": [{"id": i, "text": d, **m} for i, d, m in zip(page["ids"], page["documents"], page["metadatas"])],
+    }
+
+
+def chunk_embedding(chunk_id: str) -> list[float] | None:
+    res = _store.get(ids=[chunk_id], include=["embeddings"])
+    return [float(x) for x in res["embeddings"][0]] if len(res["ids"]) else None
+
+
 # ---------------------------------------------------------------- answering
 
 SYSTEM_PROMPT = """You are a senior software engineer and a helpful study assistant. \

@@ -47,6 +47,7 @@ document.querySelectorAll(".tab").forEach((tab) =>
     document.querySelectorAll(".tab, .view").forEach((el) => el.classList.remove("active"));
     tab.classList.add("active");
     $(`#view-${tab.dataset.view}`).classList.add("active");
+    if (tab.dataset.view === "explore") openExplore();
   })
 );
 
@@ -221,6 +222,159 @@ $("#ask-form").addEventListener("submit", async (e) => {
     q.focus();
   }
 });
+
+// ------------------------------------------------------------------ explore (read-only view of the index)
+const ix = { bookId: null, q: "", offset: 0, loaded: false, req: 0 };
+const PAGE = 50;
+const mb = (bytes) => `${(bytes / 1048576).toFixed(0)} MB`;
+
+async function openExplore() {
+  renderIxBooks();
+  if (ix.loaded) return;
+  ix.loaded = true;
+  const s = await (await fetch("/api/index")).json();
+  $("#ix-stats").innerHTML = [
+    ["Passages", s.chunks.toLocaleString()],
+    ["Books", s.books],
+    ["Embedding model", s.embed_model],
+    ["Vector size", `${s.dimensions} numbers`],
+    ["Chunking", `${s.chunk_size} chars, ${s.chunk_overlap} overlap`],
+    ["On disk", `${mb(s.sqlite_bytes)} text + ${mb(s.vectors_bytes)} vectors`],
+  ].map(([k, v]) => `<div><div class="muted">${k}</div><b>${esc(String(v))}</b></div>`).join("");
+  loadChunks(true);
+}
+
+function renderIxBooks() {
+  const term = $("#ix-book-filter").value.trim().toLowerCase();
+  const ready = state.books.filter((b) => b.status === "ready").sort((a, b) => a.title.localeCompare(b.title));
+  const total = ready.reduce((n, b) => n + b.chunks, 0);
+  $("#ix-book-list").innerHTML =
+    `<button class="ix-book ${ix.bookId ? "" : "on"}" data-id=""><span>All books</span><span class="muted">${total.toLocaleString()}</span></button>` +
+    ready.filter((b) => !term || b.title.toLowerCase().includes(term)).map((b) =>
+      `<button class="ix-book ${ix.bookId === b.id ? "on" : ""}" data-id="${b.id}" title="${esc(b.title)}">
+         <span>${esc(b.title)}</span><span class="muted">${b.chunks.toLocaleString()}</span></button>`).join("");
+}
+
+async function loadChunks(reset) {
+  if (reset) { ix.offset = 0; $("#ix-chunks").innerHTML = ""; }
+  const req = ++ix.req; // ignore responses that arrive after a newer request
+  const params = new URLSearchParams({ offset: ix.offset, limit: PAGE });
+  if (ix.bookId) params.set("book_id", ix.bookId);
+  if (ix.q) params.set("q", ix.q);
+  $("#ix-more").hidden = true;
+  $("#ix-sub").textContent = "Loading…";
+  const res = await (await fetch(`/api/chunks?${params}`)).json();
+  if (req !== ix.req) return;
+
+  const book = state.books.find((b) => b.id === ix.bookId);
+  $("#ix-title").textContent = book ? book.title : "All books";
+  ix.offset += res.chunks.length;
+  $("#ix-sub").textContent = `${res.total.toLocaleString()} passage${res.total === 1 ? "" : "s"}` +
+    (ix.q ? ` containing "${ix.q}"` : "") + (res.total ? ` · showing ${ix.offset.toLocaleString()}` : "") +
+    (book ? ` · ${book.filename}` : "");
+  $("#ix-chunks").insertAdjacentHTML("beforeend", res.chunks.map((c) => `
+    <article class="ix-chunk">
+      <div class="ix-meta">
+        <code>${esc(c.id)}</code>
+        ${ix.bookId ? "" : `<span class="ix-book-name">${esc(c.title || "")}</span>`}
+        <span>${c.page ? `p. ${c.page}` : esc(c.chapter || (c.section ? `section ${c.section}` : ""))}</span>
+        <span class="muted">${c.text.length.toLocaleString()} chars</span>
+        <button class="link ix-vec" data-id="${esc(c.id)}">Show vector</button>
+      </div>
+      <div class="ix-text">${esc(c.text)}</div>
+      <div class="ix-vector" hidden></div>
+    </article>`).join("") || '<p class="muted">Nothing found.</p>');
+  $("#ix-more").hidden = ix.offset >= res.total;
+}
+
+$("#ix-book-filter").addEventListener("input", renderIxBooks);
+$("#ix-book-list").addEventListener("click", (e) => {
+  const btn = e.target.closest(".ix-book");
+  if (!btn) return;
+  ix.bookId = btn.dataset.id || null;
+  renderIxBooks();
+  loadChunks(true);
+});
+$("#ix-search-form").addEventListener("submit", (e) => { e.preventDefault(); ix.q = $("#ix-search").value.trim(); loadChunks(true); });
+$("#ix-search").addEventListener("search", () => { if (!$("#ix-search").value) { ix.q = ""; loadChunks(true); } });
+$("#ix-more").addEventListener("click", () => loadChunks(false));
+$("#ix-chunks").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".ix-vec");
+  if (!btn) return;
+  const box = btn.closest(".ix-chunk").querySelector(".ix-vector");
+  if (!box.hidden) { box.hidden = true; btn.textContent = "Show vector"; return; }
+  const v = await (await fetch(`/api/chunks/${encodeURIComponent(btn.dataset.id)}/embedding`)).json();
+  box.textContent = `${v.dimensions} dimensions:\n[${v.embedding.map((x) => x.toFixed(5)).join(", ")}]`;
+  box.hidden = false;
+  btn.textContent = "Hide vector";
+});
+
+// ------------------------------------------------------------------ explore: raw database tables
+const db = { tables: null, name: null, offset: 0, total: 0 };
+const DB_PAGE = 100;
+const FILES = "__files__";
+
+document.querySelectorAll(".ix-mode").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".ix-mode").forEach((b) => b.classList.toggle("on", b === btn));
+    $("#ix-passages").hidden = btn.dataset.mode !== "passages";
+    $("#ix-tables").hidden = btn.dataset.mode !== "tables";
+    if (btn.dataset.mode === "tables" && !db.tables) loadDbTables();
+  })
+);
+
+async function loadDbTables() {
+  $("#db-table-list").innerHTML = '<p class="muted">Counting rows…</p>';
+  db.tables = await (await fetch("/api/db/tables")).json();
+  renderDbTables();
+  showTable(db.tables.find((t) => t.name === "embedding_metadata")?.name || db.tables[0].name);
+}
+
+function renderDbTables() {
+  $("#db-table-list").innerHTML = db.tables.map((t) =>
+    `<button class="ix-book ${db.name === t.name ? "on" : ""}" data-name="${esc(t.name)}">
+       <span>${esc(t.name)}</span><span class="muted">${t.rows.toLocaleString()}</span></button>`).join("") +
+    `<button class="ix-book ${db.name === FILES ? "on" : ""}" data-name="${FILES}"><span>📁 Files on disk</span></button>`;
+}
+
+async function showTable(name, offset = 0) {
+  db.name = name;
+  db.offset = offset;
+  renderDbTables();
+  const grid = $("#db-grid");
+  if (name === FILES) {
+    const files = await (await fetch("/api/db/files")).json();
+    $("#db-title").textContent = "Files in data/chroma";
+    $("#db-sub").textContent = "The vectors live in the binary files of the segment folder (HNSW index), not in SQLite.";
+    $("#db-prev").hidden = $("#db-next").hidden = true;
+    grid.innerHTML = "<thead><tr><th>file</th><th>size</th></tr></thead><tbody>" +
+      files.map((f) => `<tr><td>${esc(f.path)}</td><td>${mb(f.bytes)} (${f.bytes.toLocaleString()} bytes)</td></tr>`).join("") + "</tbody>";
+    return;
+  }
+  $("#db-sub").textContent = "Loading…";
+  const t = await (await fetch(`/api/db/tables/${encodeURIComponent(name)}?offset=${offset}&limit=${DB_PAGE}`)).json();
+  if (db.name !== name || db.offset !== offset) return; // a newer click won
+  db.total = t.total;
+  $("#db-title").textContent = name;
+  $("#db-sub").textContent = t.total
+    ? `rows ${(offset + 1).toLocaleString()}–${(offset + t.rows.length).toLocaleString()} of ${t.total.toLocaleString()} · ${t.columns.length} columns · click a cell to expand it`
+    : "empty table";
+  $("#db-prev").hidden = $("#db-next").hidden = t.total <= DB_PAGE;
+  $("#db-prev").disabled = offset === 0;
+  $("#db-next").disabled = offset + DB_PAGE >= t.total;
+  const cell = (v) => v === null ? '<td class="null">NULL</td>' : `<td>${esc(String(v))}</td>`;
+  grid.innerHTML = `<thead><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>` +
+    t.rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("") + "</tbody>";
+  $(".db-grid-wrap").scrollTop = 0;
+}
+
+$("#db-table-list").addEventListener("click", (e) => {
+  const btn = e.target.closest(".ix-book");
+  if (btn) showTable(btn.dataset.name);
+});
+$("#db-prev").addEventListener("click", () => showTable(db.name, Math.max(0, db.offset - DB_PAGE)));
+$("#db-next").addEventListener("click", () => showTable(db.name, db.offset + DB_PAGE));
+$("#db-grid").addEventListener("click", (e) => e.target.closest("td")?.classList.toggle("open"));
 
 checkHealth();
 setInterval(checkHealth, 15000);

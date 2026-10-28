@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ebook RAG</title>
-<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/style.css?v=5">
 </head>
 <body>
 <header>
@@ -12,6 +12,7 @@
   <nav>
     <button class="tab active" data-view="ask">Ask</button>
     <button class="tab" data-view="library">Library <span id="book-count" class="pill">0</span></button>
+    <button class="tab" data-view="explore">Explore</button>
   </nav>
   <div id="health" class="health" title="Ollama status">●</div>
 </header>
@@ -51,9 +52,56 @@
     </label>
     <div id="books" class="books"></div>
   </section>
+
+  <!-- EXPLORE: read-only view of everything in the Chroma index -->
+  <section id="view-explore" class="view">
+    <div id="ix-stats" class="ix-stats"></div>
+    <div class="ix-modes">
+      <button class="ix-mode on" data-mode="passages">Passages</button>
+      <button class="ix-mode" data-mode="tables">Database tables</button>
+    </div>
+    <div id="ix-passages" class="ix-layout">
+      <aside class="ix-books">
+        <input id="ix-book-filter" type="search" placeholder="Filter books…" autocomplete="off">
+        <div id="ix-book-list" class="ix-book-list"></div>
+      </aside>
+      <div class="ix-main">
+        <div class="ix-head">
+          <div>
+            <div id="ix-title" class="ix-title">All books</div>
+            <div id="ix-sub" class="muted"></div>
+          </div>
+          <form id="ix-search-form" class="ix-search">
+            <input id="ix-search" type="search" placeholder="Find text in passages…" autocomplete="off">
+          </form>
+        </div>
+        <div id="ix-chunks" class="ix-chunks"></div>
+        <button id="ix-more" class="ix-more" hidden>Load more</button>
+      </div>
+    </div>
+    <div id="ix-tables" class="ix-layout" hidden>
+      <aside class="ix-books">
+        <div class="muted">chroma.sqlite3 (read-only)</div>
+        <div id="db-table-list" class="ix-book-list"></div>
+      </aside>
+      <div class="ix-main">
+        <div class="ix-head">
+          <div>
+            <div id="db-title" class="ix-title"></div>
+            <div id="db-sub" class="muted"></div>
+          </div>
+          <div class="db-pager">
+            <button id="db-prev" class="ix-more">‹ Prev</button>
+            <button id="db-next" class="ix-more">Next ›</button>
+          </div>
+        </div>
+        <div class="db-grid-wrap"><table id="db-grid" class="db-grid"></table></div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div id="toast" class="toast"></div>
-<script src="/static/app.js?v=3"></script>
+<script src="/static/app.js?v=5"></script>
 </body>
 </html>

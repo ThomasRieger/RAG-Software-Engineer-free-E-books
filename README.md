@@ -53,6 +53,7 @@ Indexing the full library takes several minutes to an hour on a laptop, one book
 
 - **Ask** tab: chat with your books. Answers stream in with citations like `[1]`; expand **sources** under an answer to read the retrieved passages, with book title and page or chapter. With two or more books indexed, chips at the top limit a search to specific books. ⟲ starts a new conversation, and the last few turns are sent as context for follow-up questions.
 - **Library** tab: drag and drop PDF, EPUB, TXT or MD files anywhere on the page, or click to browse. Each book shows its indexing progress and chunk count; × deletes the book and its vectors. Re-uploading an identical file is detected by SHA-256 hash and skipped.
+- **Explore** tab: a read-only look inside the ChromaDB index. It shows overall stats (passages, embedding model, vector size, disk usage), every book with its passage count, and every passage of a book in full, with chunk ID, page and length, 50 at a time. You can search for exact text within one book or across all of them, and **Show vector** reveals the 768 numbers stored for a passage. **Database tables** shows the raw database: all of Chroma's SQLite tables with row counts, every column and row in pages of 100 (click a cell to expand it), and the vector index files on disk. Use this rather than opening `data/chroma/chroma.sqlite3` in a viewer: it's faster and can't change anything.
 - The dot at the top right shows Ollama and model status.
 
 ## The library (`sources/`)
@@ -122,6 +123,7 @@ app/
   config.py        settings (env vars above)
   loaders.py       PDF / EPUB / TXT / MD → LangChain Documents with page / chapter metadata
   rag.py           library manifest, background ingestion into Chroma, retrieval, streaming answers
+  dbview.py        read-only raw view of the Chroma SQLite tables (Explore → Database tables)
   main.py          FastAPI routes
   static/          web UI (index.html, app.js, style.css)
 import_folder.py   bulk import a folder into the running server
@@ -142,6 +144,12 @@ data/              runtime state, git-ignored:
 | `GET` | `/api/books` | Library with indexing status |
 | `POST` | `/api/books` | Multipart upload (`files`) |
 | `DELETE` | `/api/books/{id}` | Remove a book and its vectors |
+| `GET` | `/api/index` | Index stats: passage count, embedding model and dimensions, chunk settings, disk usage |
+| `GET` | `/api/chunks` | Passages in order: `?book_id=&q=&offset=0&limit=50` (limit max 200); `q` matches exact text |
+| `GET` | `/api/chunks/{id}/embedding` | The stored vector for one passage |
+| `GET` | `/api/db/tables` | Every SQLite table with row count and columns (read-only) |
+| `GET` | `/api/db/tables/{name}` | Raw rows: `?offset=0&limit=100` (limit max 500) |
+| `GET` | `/api/db/files` | Files in `data/chroma` with sizes |
 | `POST` | `/api/ask` | `{"question", "history"?, "book_ids"?}` → NDJSON stream: one `sources` event, then `token` events |
 
 ## Troubleshooting
@@ -153,5 +161,7 @@ data/              runtime state, git-ignored:
 - **Reset everything:** stop the server, `rm -rf data/`, start it, and re-run `import_folder.py sources`.
 
 ## Notes
+
+**Works offline.** After the first `./run.sh` (which downloads the models and Python packages), no internet is needed: the app only talks to Ollama on `localhost:11434`, and ChromaDB's anonymous telemetry is switched off in `app/__init__.py`. You only need internet to set up a new machine or to `git push` / `pull`.
 
 This repository holds third-party ebooks for personal study and must stay **private**. Don't make it public or redistribute the books.

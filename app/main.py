@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, rag
+from . import config, dbview, rag
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -54,6 +54,42 @@ def delete(book_id: str):
     if not rag.delete_book(book_id):
         raise HTTPException(404, "Book not found")
     return {"ok": True}
+
+
+@app.get("/api/index")
+def index_stats():
+    return rag.index_stats()
+
+
+@app.get("/api/chunks")
+def chunks(book_id: str | None = None, q: str | None = None, offset: int = 0, limit: int = 50):
+    return rag.list_chunks(book_id, q.strip() if q else None, max(offset, 0), min(max(limit, 1), 200))
+
+
+@app.get("/api/chunks/{chunk_id}/embedding")
+def chunk_embedding(chunk_id: str):
+    vector = rag.chunk_embedding(chunk_id)
+    if vector is None:
+        raise HTTPException(404, "Chunk not found")
+    return {"id": chunk_id, "dimensions": len(vector), "embedding": vector}
+
+
+@app.get("/api/db/tables")
+def db_tables():
+    return dbview.tables()
+
+
+@app.get("/api/db/tables/{name}")
+def db_table_rows(name: str, offset: int = 0, limit: int = 100):
+    result = dbview.table_rows(name, max(offset, 0), min(max(limit, 1), 500))
+    if result is None:
+        raise HTTPException(404, "No such table")
+    return result
+
+
+@app.get("/api/db/files")
+def db_files():
+    return dbview.files()
 
 
 class AskRequest(BaseModel):
