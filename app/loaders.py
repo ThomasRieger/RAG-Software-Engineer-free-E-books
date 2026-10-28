@@ -40,7 +40,7 @@ def load_epub(path: Path) -> tuple[list[Document], str | None]:
     title = titles[0][0] if titles else None
     docs = []
     for n, item in enumerate(book.get_items_of_type(ebooklib.ITEM_DOCUMENT), start=1):
-        soup = BeautifulSoup(item.get_content(), "lxml" if _has_lxml() else "html.parser")
+        soup = BeautifulSoup(item.get_content(), "html.parser")
         heading = soup.find(["h1", "h2", "h3"])
         text = _clean(soup.get_text("\n"))
         if len(text) < 50:
@@ -55,14 +55,6 @@ def load_epub(path: Path) -> tuple[list[Document], str | None]:
 def load_text(path: Path) -> tuple[list[Document], str | None]:
     text = _clean(path.read_text(encoding="utf-8", errors="ignore"))
     return [Document(page_content=text, metadata={})], None
-
-
-def _has_lxml() -> bool:
-    try:
-        import lxml  # noqa: F401
-        return True
-    except ImportError:
-        return False
 
 
 LOADERS = {".pdf": load_pdf, ".epub": load_epub, ".txt": load_text, ".md": load_text}

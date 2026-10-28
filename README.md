@@ -74,49 +74,31 @@ Indexing the full library takes several minutes to an hour on a laptop, one book
 
 Files are named `Title - Author (Publisher).pdf`, and papers `Title (arXiv ID).pdf`. **The filename is the book's title in the app** (library list and citations). Only when a filename has no spaces, like `2408.08921v1.pdf` or `big-book-agentops.pdf`, does the app fall back to the title embedded in the PDF.
 
-To add books, either drop them into the web UI, or save them under `sources/<Subject>/` with a descriptive name and run `.venv/bin/python import_folder.py sources`; books already in the library are skipped. Only `sources/` is kept in git. The app stores its own copies in `data/`, which is not committed, so to keep the two in sync, add books through `sources/`.
-
 **Known issue:** `Exploratory Data Analysis with R (scanned).pdf` has no text layer, so it can't be indexed until it's OCR'd (`brew install ocrmypdf && ocrmypdf in.pdf out.pdf`).
 
-## Scripts
+## Adding books
 
-### `import_folder.py`: bulk import
+Books are added manually:
+
+1. Save the file into the matching `sources/<Subject>/` folder, or create a new subject folder. Name it `Title - Author (Publisher).pdf`, since the filename becomes its title in the app.
+2. With the server running, index it:
+
+   ```bash
+   .venv/bin/python import_folder.py sources
+   ```
+
+   Books already in the library are skipped, so it's always safe to run this on the whole `sources/` folder.
+3. Commit the new file so the book is kept in git.
+
+You can also drop files straight into the **Library** tab of the web UI. That indexes them immediately, but the app keeps those copies only in `data/`, which isn't committed. To keep a book in git, add it to `sources/` as well.
+
+### `import_folder.py`
 
 ```bash
 .venv/bin/python import_folder.py <folder> [--url http://localhost:8000]
 ```
 
 Uploads every PDF, EPUB, TXT and MD file under the folder (recursively, skipping README files) to the running server, which indexes them in the background. It's safe to run repeatedly because duplicates are skipped. It goes through the server's API because Chroma doesn't support two processes writing to the same store.
-
-### `fetch_databricks.py`: download Databricks ebooks
-
-Databricks ebooks are behind a sign-up form. This script opens each ebook page in a headless Chromium (Playwright), fills the form with your details, and saves the PDF into the matching `sources/<Subject>/` folder. Web-only ebooks are saved as Markdown.
-
-One-time setup:
-
-```bash
-.venv/bin/playwright install chromium
-cat > .env <<'EOF'
-DBX_FIRST_NAME=...
-DBX_LAST_NAME=...
-DBX_EMAIL=...
-DBX_COMPANY=...
-DBX_JOB_TITLE=...
-DBX_COUNTRY=...
-DBX_PHONE=...
-EOF
-```
-
-```bash
-.venv/bin/python fetch_databricks.py --list     # engineering-topic ebooks only (default filter)
-.venv/bin/python fetch_databricks.py            # download them (skips ones already done)
-.venv/bin/python fetch_databricks.py --retry    # retry failures
-.venv/bin/python fetch_databricks.py --all      # every ebook (~190)
-.venv/bin/python fetch_databricks.py URL ...    # specific ebook pages
-.venv/bin/python import_folder.py sources       # index the new ones (existing books are skipped)
-```
-
-Each download goes straight into the matching subject folder (AI Agents, AI Engineering and LLMs, MLOps and ML Systems, or Data Engineering and Lakehouse), chosen from keywords in the ebook's URL. It's named `<Title> (Databricks).pdf`, using the PDF's embedded title or, when that's missing, the URL slug; check the names afterwards and tidy them if needed. If the same PDF is already somewhere in `sources/`, the download is discarded. Every form submission registers you as a Databricks sales lead. Progress is tracked in `data/databricks_state.json`, so ebooks you already have aren't downloaded again. Some older assets are retired and land on a generic "thank you" page; the script reports those as failed.
 
 ## Configuration
 
@@ -143,7 +125,6 @@ app/
   main.py          FastAPI routes
   static/          web UI (index.html, app.js, style.css)
 import_folder.py   bulk import a folder into the running server
-fetch_databricks.py  Databricks ebook downloader
 run.sh             one-command start
 sources/           the ebook library (committed)
 data/              runtime state, git-ignored:
